@@ -3,7 +3,6 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
 
-
 template <typename T, size_t MaxSize = 1024> struct BinaryTree {
   struct Node {
     T value{};
@@ -21,6 +20,27 @@ template <typename T, size_t MaxSize = 1024> struct BinaryTree {
     // make this configurable with static lambda ?
     constexpr auto should_step_left(T new_value) const noexcept {
       return new_value < value;
+    }
+
+    enum class ChildrenState {
+      NONE = 0,
+      BOTH,
+      LEFT_ONLY,
+      RIGHT_ONLY,
+    };
+
+    ChildrenState children_state() const {
+      auto l_present = left != nullptr;
+      auto r_present = right != nullptr;
+      if (l_present && r_present) {
+        return ChildrenState::BOTH;
+      } else if (l_present) {
+        return ChildrenState::LEFT_ONLY;
+      } else if (r_present) {
+        return ChildrenState::RIGHT_ONLY;
+      } else {
+        return ChildrenState::NONE;
+      }
     }
 
     constexpr void insert_below(T new_value) {
@@ -50,18 +70,49 @@ template <typename T, size_t MaxSize = 1024> struct BinaryTree {
     root->insert_below(value);
   }
 
-  Node* find(T value) {
-    if (!root) { return nullptr; }
-    Node *n = root;
-    for (;;) {
-      if (n->value == value) { return n; }
-      if (n->should_step_left(value)) {
-        if (!n->left) { return nullptr; }
-        n = n->left;
-      } else {
-        if (!n->right) { return nullptr; }
-        n = n->right;
+  auto remove(T value) {
+    auto rm = [](auto *n, auto *parent) {
+      switch (n->children_state()) {
+      case Node::ChildrenState::NONE:
+        // was i left or right child ?
+        delete n;
+        if (parent->left == n) {
+          parent->left = nullptr;
+        } else {
+          parent->right = nullptr;
+        }
+        break;
+      case Node::ChildrenState::RIGHT_ONLY:
+        break;
+      case Node::ChildrenState::LEFT_ONLY:
+        break;
+      case Node::ChildrenState::BOTH:
+        break;
       }
+    };
+
+    find(value, rm);
+  }
+
+  using F = std::function<void(Node *, Node *)>;
+  Node *find(
+      T value, F &&f = [](auto *, auto *) {}) {
+    if (!root) {
+      return nullptr;
+    }
+    Node *n = root;
+    Node *parent = nullptr;
+    for (;;) {
+      if (n->value == value) {
+        f(n, parent);
+        return n;
+      }
+      auto *next = n->should_step_left(value) ? n->left : n->right;
+      if (!next) {
+        return nullptr;
+      }
+      parent = n;
+      n = next;
     }
   }
 };
@@ -113,6 +164,25 @@ TEST_CASE("can find") {
 
   tree.insert(0xfffff678);
   REQUIRE(tree.find(0xfffff678));
+};
+
+TEST_CASE("zeroo children node deletion") {
+  auto tree = BinaryTree<int>{};
+  tree.insert(1);
+  tree.insert(2);
+  tree.insert(3);
+  tree.insert(4);
+
+  REQUIRE(tree.root->right->value == 2);
+  REQUIRE(tree.root->right->right->value == 3);
+  REQUIRE(tree.root->right->right->right->value == 4);
+  REQUIRE(tree.root->right->right->right != nullptr);
+  REQUIRE(tree.root->right->right->right->children_state() ==
+          BinaryTree<int>::Node::ChildrenState::NONE);
+
+  tree.remove(4);
+
+  REQUIRE(tree.root->right->right->right == nullptr);
 };
 
 TEST_CASE("Hello, World!") { REQUIRE(1 == 1); }
