@@ -4,12 +4,19 @@
 #include <catch2/catch_all.hpp>
 
 template <typename T, size_t MaxSize = 1024> struct BinaryTree {
+  ~BinaryTree() {
+    if (root) {
+      root->delete_recursive();
+      delete root;
+    }
+  }
   struct Node {
     T value{};
 
-    ~Node() {
-      for (auto *n : std::initializer_list<Node *>{left, right}) {
+    void delete_recursive() {
+      for (auto* n : std::initializer_list<Node *>{left, right}) {
         if (n) {
+          n->delete_recursive();
           delete n;
         }
       }
@@ -83,10 +90,16 @@ template <typename T, size_t MaxSize = 1024> struct BinaryTree {
         }
         break;
       case Node::ChildrenState::RIGHT_ONLY:
+        parent->right = n->right;
+        delete n;
         break;
       case Node::ChildrenState::LEFT_ONLY:
+        parent->left = n->left;
+        delete n;
         break;
       case Node::ChildrenState::BOTH:
+        // more complex things
+        // do the rotation
         break;
       }
     };
@@ -94,23 +107,20 @@ template <typename T, size_t MaxSize = 1024> struct BinaryTree {
     find(value, rm);
   }
 
-  using F = std::function<void(Node *, Node *)>;
+  using OnFoundNode = std::function<void(Node *, Node *)>;
   Node *find(
-      T value, F &&f = [](auto *, auto *) {}) {
-    if (!root) {
-      return nullptr;
-    }
+      T value, OnFoundNode &&on_found_node = [](auto *, auto *) {}) {
+
+    if (!root) { return nullptr; }
     Node *n = root;
     Node *parent = nullptr;
     for (;;) {
       if (n->value == value) {
-        f(n, parent);
+        on_found_node(n, parent);
         return n;
       }
       auto *next = n->should_step_left(value) ? n->left : n->right;
-      if (!next) {
-        return nullptr;
-      }
+      if (!next) { return nullptr; }
       parent = n;
       n = next;
     }
@@ -183,6 +193,20 @@ TEST_CASE("zeroo children node deletion") {
   tree.remove(4);
 
   REQUIRE(tree.root->right->right->right == nullptr);
+
+  // add 4 back
+  tree.insert(4);
+  REQUIRE(tree.root->right->right->right->value == 4);
+  REQUIRE(tree.root->right->right->right != nullptr);
+
+  tree.remove(3);
+  REQUIRE(tree.root->right->right->value == 4);
+
+  tree.insert(-1);
+  tree.insert(-3);
+  tree.remove(-1);
+
+  REQUIRE(tree.root->left->value == -3);
 };
 
 TEST_CASE("Hello, World!") { REQUIRE(1 == 1); }
