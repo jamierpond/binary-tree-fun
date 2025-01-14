@@ -12,49 +12,47 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
     }
   }
 
-  auto min() {
-    if (!root) { return T{}; }
-    return root->min();
-  }
-
-  auto max() {
-    if (!root) { return T{}; }
-    return root->max();
-  }
-
   struct Node {
     T value{};
     DataStruct data{};
+    Node *left = nullptr;
+    Node *right = nullptr;
 
-    auto min() {
-      return traverse_extreme([](auto *n) { return n->left; });
-    }
-
-    auto max() {
-      return traverse_extreme([](auto *n) { return n->right; });
-    }
-
+    auto min() { return traverse_extreme([](auto *n) { return n->left; }); }
+    auto max() { return traverse_extreme([](auto *n) { return n->right; }); }
     auto traverse_extreme(auto get_next) {
       auto *n = this;
       while (get_next(n)) { n = get_next(n); }
-      return n->value;
+      return n;
     }
 
     void delete_recursive() {
-      for (auto* n : {left, right}) {
+      for (auto *n : {left, right}) {
         if (n) {
           n->delete_recursive();
+          n = nullptr;
           delete n;
         }
       }
     }
 
-    Node *left = nullptr;
-    Node *right = nullptr;
-
-    // make this configurable with static lambda ?
-    constexpr auto should_step_left(T new_value) const noexcept {
-      return new_value < value;
+    using FoundNodeCallback = std::function<void(Node *, Node *)>;
+    Node *find(
+        T value, FoundNodeCallback on_found_node = [](auto *, auto *) {},
+        Node *parent = nullptr) {
+      Node *n = this;
+      for (;;) {
+        if (n->value == value) {
+          on_found_node(n, parent);
+          return n;
+        }
+        auto *next = n->should_step_left(value) ? n->left : n->right;
+        if (!next) {
+          return nullptr;
+        }
+        parent = n;
+        n = next;
+      }
     }
 
     enum class ChildrenState {
@@ -63,6 +61,49 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
       LEFT_ONLY,
       RIGHT_ONLY,
     };
+
+    void remove(T value, Node *parent = nullptr) {
+      FoundNodeCallback rm = [](Node *n, Node *parent) {
+        auto we_are_left = [&]() {
+          // we kind of guarantee the right should not be nullptr
+          // since at this point every node has at least one child
+          if (!parent->left) { return false; }
+          return parent->left == n;
+        }();
+
+        switch (n->children_state()) {
+        case Node::ChildrenState::NONE: {
+          delete n;
+          auto &side = we_are_left ? parent->left : parent->right;
+          side = nullptr;
+        } break;
+        case Node::ChildrenState::RIGHT_ONLY:
+          parent->right = n->right;
+          delete n;
+          break;
+        case Node::ChildrenState::LEFT_ONLY:
+          parent->left = n->left;
+          delete n;
+          break;
+        case Node::ChildrenState::BOTH: {
+          auto *right_min = n->right->min();
+          auto right_min_value = right_min->value;
+          n->value = right_min_value;
+          n->right->remove(right_min_value, n);
+        } break;
+        default:
+          // unreachable
+          std::abort();
+        }
+      };
+
+      find(value, rm, parent);
+    }
+
+    // make this configurable with static lambda ?
+    constexpr auto should_step_left(T new_value) const noexcept {
+      return new_value < value;
+    }
 
     ChildrenState children_state() const {
       auto l_present = left != nullptr;
@@ -78,81 +119,44 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
       }
     }
 
-    constexpr void insert_below(T new_value) {
-      auto insertion = [](auto &side, auto value) {
-        if (side) {
-          side->insert_below(value);
-        } else {
-          side = new Node{value};
-        }
-      };
-
-      if (should_step_left(new_value)) {
-        insertion(left, new_value);
+    constexpr void insert(T new_value) {
+      auto &side = should_step_left(new_value) ? left : right;
+      if (side) {
+        side->insert(new_value);
       } else {
-        insertion(right, new_value);
+        side = new Node{new_value};
       }
     }
   };
 
   Node *root = nullptr;
 
+  Node *find(T value) {
+    if (!root) { return nullptr; }
+    return root->find(value);
+  }
+
+  Node *min() {
+    if (!root) { return nullptr; }
+    return root->min();
+  }
+
+  Node *max() {
+    if (!root) { return nullptr; }
+    return root->max();
+  }
+
+  auto remove(T value) {
+    if (!root) { return; }
+    root->remove(value, root);
+  }
+
   auto insert(T value) {
     if (!root) {
       root = new Node(value);
       return;
     }
-    root->insert_below(value);
-  }
-
-  auto remove(T value) {
-    auto rm = [](auto *n, auto *parent) {
-      auto we_are_left = parent->left == n;
-      switch (n->children_state()) {
-      case Node::ChildrenState::NONE:
-        delete n;
-        if (we_are_left) {
-          parent->left = nullptr;
-        } else {
-          parent->right = nullptr;
-        }
-        break;
-      case Node::ChildrenState::RIGHT_ONLY:
-        parent->right = n->right;
-        delete n;
-        break;
-      case Node::ChildrenState::LEFT_ONLY:
-        parent->left = n->left;
-        delete n;
-        break;
-      case Node::ChildrenState::BOTH:
-        break;
-      default:
-        // unreachable
-        std::abort();
-      }
-    };
-
-    find(value, rm);
-  }
-
-  using OnFoundNode = std::function<void(Node *, Node *)>;
-  Node *find(
-      T value, OnFoundNode &&on_found_node = [](auto *, auto *) {}) {
-
-    if (!root) { return nullptr; }
-    Node *n = root;
-    Node *parent = nullptr;
-    for (;;) {
-      if (n->value == value) {
-        on_found_node(n, parent);
-        return n;
-      }
-      auto *next = n->should_step_left(value) ? n->left : n->right;
-      if (!next) { return nullptr; }
-      parent = n;
-      n = next;
-    }
+    root->insert(value);
   }
 };
 
@@ -188,6 +192,31 @@ TEST_CASE("can alternate") {
   REQUIRE(tree.root->right->left->value == 11);
   REQUIRE(tree.root->right->right->value == 1100);
   REQUIRE(tree.root->left->value == -1);
+};
+
+TEST_CASE("delete child with two nodes") {
+  auto tree = BinaryTree<int>{};
+  // fork
+  tree.insert(10);
+  tree.insert(15);
+  tree.insert(5);
+  tree.insert(3);
+  tree.insert(6);
+
+  // REQUIRE(tree.root->left->left->left->value == 2);
+  REQUIRE(tree.root->right->value == 15);
+
+  auto five = tree.root->left;
+  REQUIRE(five->value == 5);
+  auto three = five->left;
+  REQUIRE(three->value == 3);
+
+  auto six = five->right;
+  REQUIRE(six->value == 6);
+
+  tree.remove(5);
+
+  // ok so let's remove 5 whuic
 };
 
 TEST_CASE("can find") {
@@ -237,10 +266,9 @@ TEST_CASE("zeroo children node deletion") {
 
   REQUIRE(tree.root->left->value == -3);
 
-
   // test min and max
-  REQUIRE(tree.min() == -3);
-  REQUIRE(tree.max() == 4);
+  REQUIRE(tree.min()->value == -3);
+  REQUIRE(tree.max()->value == 4);
 };
 
 TEST_CASE("Hello, World!") { REQUIRE(1 == 1); }
