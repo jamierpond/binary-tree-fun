@@ -12,9 +12,33 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
     }
   }
 
+  auto min() {
+    if (!root) { return T{}; }
+    return root->min();
+  }
+
+  auto max() {
+    if (!root) { return T{}; }
+    return root->max();
+  }
+
   struct Node {
     T value{};
     DataStruct data{};
+
+    auto min() {
+      return traverse_extreme([](auto *n) { return n->left; });
+    }
+
+    auto max() {
+      return traverse_extreme([](auto *n) { return n->right; });
+    }
+
+    auto traverse_extreme(auto get_next) {
+      auto *n = this;
+      while (get_next(n)) { n = get_next(n); }
+      return n->value;
+    }
 
     void delete_recursive() {
       for (auto* n : {left, right}) {
@@ -27,6 +51,7 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
 
     Node *left = nullptr;
     Node *right = nullptr;
+
     // make this configurable with static lambda ?
     constexpr auto should_step_left(T new_value) const noexcept {
       return new_value < value;
@@ -82,11 +107,11 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
 
   auto remove(T value) {
     auto rm = [](auto *n, auto *parent) {
+      auto we_are_left = parent->left == n;
       switch (n->children_state()) {
       case Node::ChildrenState::NONE:
-        // was i left or right child ?
         delete n;
-        if (parent->left == n) {
+        if (we_are_left) {
           parent->left = nullptr;
         } else {
           parent->right = nullptr;
@@ -101,9 +126,10 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
         delete n;
         break;
       case Node::ChildrenState::BOTH:
-        // more complex things
-        // do the rotation
         break;
+      default:
+        // unreachable
+        std::abort();
       }
     };
 
@@ -210,6 +236,11 @@ TEST_CASE("zeroo children node deletion") {
   tree.remove(-1);
 
   REQUIRE(tree.root->left->value == -3);
+
+
+  // test min and max
+  REQUIRE(tree.min() == -3);
+  REQUIRE(tree.max() == 4);
 };
 
 TEST_CASE("Hello, World!") { REQUIRE(1 == 1); }
