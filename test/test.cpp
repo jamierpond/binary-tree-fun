@@ -1,20 +1,23 @@
 #include "catch2/catch_test_macros.hpp"
-#include <initializer_list>
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
 
-template <typename T, size_t MaxSize = 1024> struct BinaryTree {
+struct NoData {};
+
+template <typename T, typename DataStruct = NoData> struct BinaryTree {
   ~BinaryTree() {
     if (root) {
       root->delete_recursive();
       delete root;
     }
   }
+
   struct Node {
     T value{};
+    DataStruct data{};
 
     void delete_recursive() {
-      for (auto* n : std::initializer_list<Node *>{left, right}) {
+      for (auto* n : {left, right}) {
         if (n) {
           n->delete_recursive();
           delete n;
