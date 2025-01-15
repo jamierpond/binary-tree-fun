@@ -2,14 +2,109 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
 
+
+namespace traversal {
+
+template <typename Node, typename Callback>
+constexpr void in_order (Node *node, Callback &&callback) {
+  if (!node) { return; }
+  in_order(node->left, callback);
+  callback(node);
+  in_order(node->right, callback);
+};
+
+template <typename Node, typename Callback>
+constexpr void pre_order (Node *node, Callback &&callback) {
+  if (!node) { return; }
+  callback(node);
+  pre_order(node->left, callback);
+  pre_order(node->right, callback);
+};
+
+template <typename Node, typename Callback>
+constexpr void post_order (Node *node, Callback &&callback) {
+  if (!node) { return; }
+  post_order(node->left, callback);
+  post_order(node->right, callback);
+  callback(node);
+};
+
+
+template <typename Node, typename Callback>
+constexpr Node* extreme(Node *node, Callback &&callback, auto get_next) {
+  auto *n = node;
+  while (get_next(n)) {
+    callback(n);
+    n = get_next(n);
+  }
+  return n;
+};
+
+template <typename Node, typename Callback>
+constexpr Node* extreme_left(Node *node, Callback &&callback = [](auto*){}) {
+    return extreme(node, callback, [](auto *n) { return n->left; });
+};
+
+template <typename Node, typename Callback>
+constexpr Node* extreme_right(Node *node, Callback &&callback) {
+    return extreme(node, callback, [](auto *n) { return n->right; });
+};
+
+template <typename T, typename Node, typename Callback>
+Node *find(Node* root, T value, Node *parent = nullptr, Callback &&on_found_node = [](auto *, auto *) {}) {
+  Node *n = root;
+  for (;;) {
+    if (n->value == value) {
+      on_found_node(n, parent);
+      return n;
+    }
+    auto *next = n->should_step_left(value) ? n->left : n->right;
+    if (!next) {
+      return nullptr;
+    }
+    parent = n;
+    n = next;
+  }
+}
+
+//     auto min() { return traverse_extreme([](auto *n) { return n->left; }); }
+//     auto max() { return traverse_extreme([](auto *n) { return n->right; }); }
+//     auto traverse_extreme(auto get_next) {
+//       auto *n = this;
+//       while (get_next(n)) { n = get_next(n); }
+//       return n;
+//     }
+
+ // template <typename Node, typename Callback>
+ // constexpr void level_order (Node *node, Callback &&callback) {
+ //   if (!node) { return; }
+ //   std::queue<Node *> q;
+ //   q.push(node);
+ //   while (!q.empty()) {
+ //     auto *n = q.front();
+ //     q.pop();
+ //     callback(n);
+ //     if (n->left) { q.push(n->left); }
+ //     if (n->right) { q.push(n->right); }
+ //   }
+ // };
+
+} // namespace traversal
+
+
 struct NoData {};
 
+#include <iostream>
 template <typename T, typename DataStruct = NoData> struct BinaryTree {
   ~BinaryTree() {
-    if (root) {
-      root->delete_recursive();
-      delete root;
-    }
+      traversal::post_order(root, [](auto *n) {
+          std::cout << "deleting " << n->value << std::endl;
+          delete n;
+      });
+  }
+
+  void print_smallest_to_biggest() {
+    traversal::in_order(root, [](auto *n) { std::cout << n->value << std::endl; });
   }
 
   struct Node {
@@ -18,71 +113,31 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
     Node *left = nullptr;
     Node *right = nullptr;
 
-    auto min() { return traverse_extreme([](auto *n) { return n->left; }); }
-    auto max() { return traverse_extreme([](auto *n) { return n->right; }); }
-    auto traverse_extreme(auto get_next) {
-      auto *n = this;
-      while (get_next(n)) { n = get_next(n); }
-      return n;
-    }
+    constexpr static auto noop = [](auto *) {};
+    auto min() { return traversal::extreme_left(this, noop); }
+    auto max() { return traversal::extreme_right(this, noop); }
 
-    void delete_recursive() {
-      for (auto *n : {left, right}) {
-        if (n) {
-          n->delete_recursive();
-          n = nullptr;
-          delete n;
-        }
-      }
-    }
-
-    using FoundNodeCallback = std::function<void(Node *, Node *)>;
-    Node *find(
-        T value, FoundNodeCallback on_found_node = [](auto *, auto *) {},
-        Node *parent = nullptr) {
-      Node *n = this;
-      for (;;) {
-        if (n->value == value) {
-          on_found_node(n, parent);
-          return n;
-        }
-        auto *next = n->should_step_left(value) ? n->left : n->right;
-        if (!next) {
-          return nullptr;
-        }
-        parent = n;
-        n = next;
-      }
-    }
-
-    enum class ChildrenState {
-      NONE = 0,
-      BOTH,
-      LEFT_ONLY,
-      RIGHT_ONLY,
-    };
-
-    void remove(T value, Node *parent = nullptr) {
-      FoundNodeCallback rm = [](Node *n, Node *parent) {
+    void remove (T value, Node *parent = nullptr) {
+      constexpr auto rm = [](Node *n, Node *direct_parent) {
         auto we_are_left = [&]() {
           // we kind of guarantee the right should not be nullptr
           // since at this point every node has at least one child
-          if (!parent->left) { return false; }
-          return parent->left == n;
+          if (!direct_parent->left) { return false; }
+          return direct_parent->left == n;
         }();
 
         switch (n->children_state()) {
         case Node::ChildrenState::NONE: {
           delete n;
-          auto &side = we_are_left ? parent->left : parent->right;
+          auto &side = we_are_left ? direct_parent->left : direct_parent->right;
           side = nullptr;
         } break;
         case Node::ChildrenState::RIGHT_ONLY:
-          parent->right = n->right;
+          direct_parent->right = n->right;
           delete n;
           break;
         case Node::ChildrenState::LEFT_ONLY:
-          parent->left = n->left;
+          direct_parent->left = n->left;
           delete n;
           break;
         case Node::ChildrenState::BOTH: {
@@ -96,9 +151,20 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
           std::abort();
         }
       };
-
-      find(value, rm, parent);
+      traversal::find<T>(this, value, parent, rm);
     }
+
+    Node *find(T value) {
+      constexpr auto noop = [](auto *, auto *) {};
+      return traversal::find<T, Node>(this, value, nullptr, noop);
+    }
+
+    enum class ChildrenState {
+      NONE = 0,
+      BOTH,
+      LEFT_ONLY,
+      RIGHT_ONLY,
+    };
 
     // make this configurable with static lambda ?
     constexpr auto should_step_left(T new_value) const noexcept {
@@ -215,8 +281,6 @@ TEST_CASE("delete child with two nodes") {
   REQUIRE(six->value == 6);
 
   tree.remove(5);
-
-  // ok so let's remove 5 whuic
 };
 
 TEST_CASE("can find") {
@@ -234,7 +298,7 @@ TEST_CASE("can find") {
   REQUIRE(tree.find(0xfffff678));
 };
 
-TEST_CASE("zeroo children node deletion") {
+TEST_CASE("zero children node deletion") {
   auto tree = BinaryTree<int>{};
   tree.insert(1);
   tree.insert(2);
@@ -269,6 +333,9 @@ TEST_CASE("zeroo children node deletion") {
   // test min and max
   REQUIRE(tree.min()->value == -3);
   REQUIRE(tree.max()->value == 4);
+
+  std::cout << "+++++ smallest to biggest +++++" << std::endl;
+  tree.print_smallest_to_biggest();
 };
 
 TEST_CASE("Hello, World!") { REQUIRE(1 == 1); }
