@@ -1,7 +1,7 @@
 #include "catch2/catch_test_macros.hpp"
+#include <cstdint>
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
-
 
 namespace traversal {
 
@@ -98,9 +98,24 @@ struct NoData {};
 template <typename T, typename DataStruct = NoData> struct BinaryTree {
   ~BinaryTree() {
       traversal::post_order(root, [](auto *n) {
-          std::cout << "deleting " << n->value << std::endl;
           delete n;
       });
+  }
+
+  bool check_tree_valid() const /* throws */ {
+    if (!root) { return true; }
+    auto current = min()->value;
+    try {
+      traversal::in_order(root, [&](auto *n) {
+        if (n->value < current) {
+          throw std::runtime_error("tree is not valid");
+        }
+        current = n->value;
+      });
+    } catch (const std::runtime_error &e) {
+      return false;
+    }
+    return true;
   }
 
   void print_smallest_to_biggest() {
@@ -185,7 +200,7 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
       }
     }
 
-    constexpr void insert(T new_value) {
+    void insert(T new_value) {
       auto &side = should_step_left(new_value) ? left : right;
       if (side) {
         side->insert(new_value);
@@ -202,12 +217,12 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
     return root->find(value);
   }
 
-  Node *min() {
+  Node *min() const {
     if (!root) { return nullptr; }
     return root->min();
   }
 
-  Node *max() {
+  Node *max() const {
     if (!root) { return nullptr; }
     return root->max();
   }
@@ -223,6 +238,12 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
       return;
     }
     root->insert(value);
+#ifndef NDEBUG
+    if (!check_tree_valid()) {
+      std::cerr << "tree is not valid" << std::endl;
+      std::abort();
+    }
+#endif
   }
 };
 
@@ -333,9 +354,34 @@ TEST_CASE("zero children node deletion") {
   // test min and max
   REQUIRE(tree.min()->value == -3);
   REQUIRE(tree.max()->value == 4);
+  REQUIRE(tree.check_tree_valid());
 
   std::cout << "+++++ smallest to biggest +++++" << std::endl;
   tree.print_smallest_to_biggest();
+};
+
+
+auto fuzz = [](auto lower, auto upper) {
+  auto tree = BinaryTree<int>{};
+  uint64_t seed = 0;
+
+  for (int i = 0; i < 1'000; i++) {
+    auto next = rand() % (upper - lower) + lower;
+    std::cout << "find " << tree.find(next) << std::endl;
+    std::cout << "foo " << next << std::endl;
+    tree.insert(next);
+    std::cout << "find " << tree.find(next)->value << std::endl;
+  }
+
+  REQUIRE(tree.check_tree_valid());
+};
+
+TEST_CASE("random inserts") {
+  fuzz(-20, 10);
+  fuzz(0, 10);
+  fuzz(0, 1);
+  fuzz(10, -20);
+  fuzz(1 << 1, 1 << 15);
 };
 
 TEST_CASE("Hello, World!") { REQUIRE(1 == 1); }
