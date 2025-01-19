@@ -10,7 +10,7 @@ struct TreeUtils {
     });
   }
 
-  static bool check_tree_valid(Tree& tree) /* throws */ {
+  static bool check_tree_valid(const Tree& tree) /* throws */ {
     if (!tree.root) { return true; }
     auto current = tree.min()->value;
     auto max = tree.max()->value;
@@ -25,6 +25,7 @@ struct TreeUtils {
       return false;
     }
     if (current != max) {
+      // if we didn't end up at the max value, the tree is invalid!
       return false;
     }
     return true;
