@@ -121,8 +121,6 @@ TEST_CASE("zero children node deletion") {
 
 auto fuzz = [](auto lower, auto upper) {
   auto tree = BinarySearchTree<int>{};
-  uint64_t seed = 0;
-
   for (int i = 0; i < 1'000; i++) {
     auto next = rand() % (upper - lower) + lower;
     auto* found = tree.find(next);
