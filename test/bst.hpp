@@ -1,10 +1,13 @@
+#pragma once
 #include "tree_utils.hpp"
 #include "tree_traversal.hpp"
 
 struct NoData {};
 
 template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
-  ~BinarySearchTree() {
+  constexpr BinarySearchTree() = default;
+  constexpr BinarySearchTree(T value) : root(new Node{value}) {}
+  constexpr ~BinarySearchTree() {
       traversal::post_order(root, [](auto *n) {
           delete n;
       });
@@ -19,10 +22,10 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
     Node *right = nullptr;
 
     constexpr static auto noop = [](auto *) {};
-    auto min() { return traversal::extreme_left(this, noop); }
-    auto max() { return traversal::extreme_right(this, noop); }
+    constexpr auto min() { return traversal::extreme_left(this, noop); }
+    constexpr auto max() { return traversal::extreme_right(this, noop); }
 
-    void remove (T value, Node *parent = nullptr) {
+    constexpr void remove (T value, Node *parent = nullptr) {
       constexpr auto on_found = [](auto *& n, auto *& direct_parent) {
         auto left_exists = n->left != nullptr;
         auto right_exists = n->right != nullptr;
@@ -53,7 +56,7 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
       traversal::find<T>(this, value, parent, on_found);
     }
 
-    Node *find(T value) {
+    constexpr Node *find(T value) {
       constexpr auto noop = [](auto *, auto *) {};
       return traversal::find<T, Node>(this, value, nullptr, noop);
     }
@@ -63,7 +66,7 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
       return new_value < value;
     }
 
-    void insert(T new_value) {
+    constexpr void insert(T new_value) {
       if (new_value == value) { return; }
       auto &side = should_step_left(new_value) ? left : right;
       if (side) {
@@ -76,34 +79,34 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
 
   Node *root = nullptr;
 
-  Node *find(T value) {
+  constexpr Node *find(T value) {
     if (!root) { return nullptr; }
     return root->find(value);
   }
 
-  Node *min() const {
+  constexpr Node *min() const {
     if (!root) { return nullptr; }
     return root->min();
   }
 
-  Node *max() const {
+  constexpr Node *max() const {
     if (!root) { return nullptr; }
     return root->max();
   }
 
-  auto remove(T value) {
+  constexpr auto remove(T value) {
     if (!root) { return; }
     root->remove(value, root);
-    Utils::debug_tree_check(*this);
+    // Utils::debug_tree_check(*this);
   }
 
-  auto insert(T value) {
+  constexpr auto insert(T value) {
     if (!root) {
       root = new Node(value);
       return;
     }
     root->insert(value);
-    Utils::debug_tree_check(*this);
+    // Utils::debug_tree_check(*this);
   }
 };
 

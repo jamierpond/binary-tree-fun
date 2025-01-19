@@ -3,7 +3,14 @@
 #include <catch2/catch_all.hpp>
 #include <iostream>
 #include <cstdint>
+// #include "max_pooling.hpp"
 #include "bst.hpp"
+
+static_assert([]() {
+  auto tree = BinarySearchTree<int>(4);
+  tree.insert(2);
+  return tree.root->left->value == 2;
+}());
 
 
 TEST_CASE("extreme right insertion works") {
