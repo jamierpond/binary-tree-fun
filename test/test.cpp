@@ -22,6 +22,20 @@ constexpr void pre_order (Node *node, Callback &&callback) {
 };
 
 template <typename Node, typename Callback>
+constexpr void level_order (Node *node, Callback &&callback) {
+  if (!node) { return; }
+  std::queue<Node *> q{};
+  q.push(node);
+  while (!q.empty()) {
+    auto *n = q.front();
+    q.pop();
+    callback(n);
+    if (n->left) { q.push(n->left); }
+    if (n->right) { q.push(n->right); }
+  }
+};
+
+template <typename Node, typename Callback>
 constexpr void post_order (Node *node, Callback &&callback) {
   if (!node) { return; }
   post_order(node->left, callback);
@@ -51,7 +65,7 @@ constexpr Node* extreme_right(Node *node, Callback &&callback) {
 };
 
 template <typename T, typename Node, typename Callback>
-Node *find(Node* root, T value, Node *parent = nullptr, Callback &&on_found_node = [](auto *, auto *) {}) {
+Node *find(Node* root, T value, Node *parent = nullptr, Callback &&on_found_node = [](auto*&, auto*&) {}) {
   Node *n = root;
   for (;;) {
     if (n->value == value) {
@@ -67,28 +81,6 @@ Node *find(Node* root, T value, Node *parent = nullptr, Callback &&on_found_node
   }
 }
 
-//     auto min() { return traverse_extreme([](auto *n) { return n->left; }); }
-//     auto max() { return traverse_extreme([](auto *n) { return n->right; }); }
-//     auto traverse_extreme(auto get_next) {
-//       auto *n = this;
-//       while (get_next(n)) { n = get_next(n); }
-//       return n;
-//     }
-
- // template <typename Node, typename Callback>
- // constexpr void level_order (Node *node, Callback &&callback) {
- //   if (!node) { return; }
- //   std::queue<Node *> q;
- //   q.push(node);
- //   while (!q.empty()) {
- //     auto *n = q.front();
- //     q.pop();
- //     callback(n);
- //     if (n->left) { q.push(n->left); }
- //     if (n->right) { q.push(n->right); }
- //   }
- // };
-
 } // namespace traversal
 
 
@@ -100,6 +92,13 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
       traversal::post_order(root, [](auto *n) {
           delete n;
       });
+  }
+
+
+  void print() {
+    traversal::in_order(root, [](auto *n) {
+      std::cout << n->value << std::endl;
+    });
   }
 
   bool check_tree_valid() const /* throws */ {
@@ -133,40 +132,34 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
     auto max() { return traversal::extreme_right(this, noop); }
 
     void remove (T value, Node *parent = nullptr) {
-      constexpr auto rm = [](Node *n, Node *direct_parent) {
-        auto we_are_left = [&]() {
-          // we kind of guarantee the right should not be nullptr
-          // since at this point every node has at least one child
-          if (!direct_parent->left) { return false; }
-          return direct_parent->left == n;
+      constexpr auto on_found = [](auto *& n, auto *& direct_parent) {
+        auto left_exists = n->left != nullptr;
+        auto right_exists = n->right != nullptr;
+        auto has_both_children = left_exists && right_exists;
+        bool we_are_left = [&] {
+          if (direct_parent->left) {
+            return direct_parent->left->value == n->value;
+          }
+          return false;
         }();
+        auto& our_ptr_on_parent = we_are_left ? direct_parent->left : direct_parent->right;
 
-        switch (n->children_state()) {
-        case Node::ChildrenState::NONE: {
+        if (has_both_children) {
+          auto *min = n->right->min();
+          n->value = min->value;
+          n->right->remove(min->value, n);
+        } else if (left_exists) {
+          our_ptr_on_parent = n->left;
           delete n;
-          auto &side = we_are_left ? direct_parent->left : direct_parent->right;
-          side = nullptr;
-        } break;
-        case Node::ChildrenState::RIGHT_ONLY:
-          direct_parent->right = n->right;
+        } else if (right_exists) {
+          our_ptr_on_parent = n->right;
           delete n;
-          break;
-        case Node::ChildrenState::LEFT_ONLY:
-          direct_parent->left = n->left;
+        } else {
+          our_ptr_on_parent = nullptr;
           delete n;
-          break;
-        case Node::ChildrenState::BOTH: {
-          auto *right_min = n->right->min();
-          auto right_min_value = right_min->value;
-          n->value = right_min_value;
-          n->right->remove(right_min_value, n);
-        } break;
-        default:
-          // unreachable
-          std::abort();
         }
       };
-      traversal::find<T>(this, value, parent, rm);
+      traversal::find<T>(this, value, parent, on_found);
     }
 
     Node *find(T value) {
@@ -174,33 +167,13 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
       return traversal::find<T, Node>(this, value, nullptr, noop);
     }
 
-    enum class ChildrenState {
-      NONE = 0,
-      BOTH,
-      LEFT_ONLY,
-      RIGHT_ONLY,
-    };
-
     // make this configurable with static lambda ?
-    constexpr auto should_step_left(T new_value) const noexcept {
+    constexpr auto should_step_left(T new_value) noexcept {
       return new_value < value;
     }
 
-    ChildrenState children_state() const {
-      auto l_present = left != nullptr;
-      auto r_present = right != nullptr;
-      if (l_present && r_present) {
-        return ChildrenState::BOTH;
-      } else if (l_present) {
-        return ChildrenState::LEFT_ONLY;
-      } else if (r_present) {
-        return ChildrenState::RIGHT_ONLY;
-      } else {
-        return ChildrenState::NONE;
-      }
-    }
-
     void insert(T new_value) {
+      if (new_value == value) { return; }
       auto &side = should_step_left(new_value) ? left : right;
       if (side) {
         side->insert(new_value);
@@ -227,9 +200,19 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
     return root->max();
   }
 
+  auto debug_tree_check() {
+#ifndef NDEBUG
+    if (!check_tree_valid()) {
+      std::cerr << "tree is not valid" << std::endl;
+      std::abort();
+    }
+#endif
+  }
+
   auto remove(T value) {
     if (!root) { return; }
     root->remove(value, root);
+    debug_tree_check();
   }
 
   auto insert(T value) {
@@ -238,12 +221,7 @@ template <typename T, typename DataStruct = NoData> struct BinaryTree {
       return;
     }
     root->insert(value);
-#ifndef NDEBUG
-    if (!check_tree_valid()) {
-      std::cerr << "tree is not valid" << std::endl;
-      std::abort();
-    }
-#endif
+    debug_tree_check();
   }
 };
 
@@ -330,8 +308,8 @@ TEST_CASE("zero children node deletion") {
   REQUIRE(tree.root->right->right->value == 3);
   REQUIRE(tree.root->right->right->right->value == 4);
   REQUIRE(tree.root->right->right->right != nullptr);
-  REQUIRE(tree.root->right->right->right->children_state() ==
-          BinaryTree<int>::Node::ChildrenState::NONE);
+
+  tree.print();
 
   tree.remove(4);
 
@@ -367,11 +345,17 @@ auto fuzz = [](auto lower, auto upper) {
 
   for (int i = 0; i < 1'000; i++) {
     auto next = rand() % (upper - lower) + lower;
-    std::cout << "find " << tree.find(next) << std::endl;
-    std::cout << "foo " << next << std::endl;
+    auto* found = tree.find(next);
     tree.insert(next);
-    std::cout << "find " << tree.find(next)->value << std::endl;
   }
+
+  // remove some random ones
+  std::vector<BinaryTree<int>::Node*> to_remove{};
+  traversal::in_order(tree.root, [&](auto *n) {
+    if (rand() % 2) {
+       to_remove.push_back(n);
+    }
+  });
 
   REQUIRE(tree.check_tree_valid());
 };
