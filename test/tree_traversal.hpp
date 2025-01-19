@@ -3,6 +3,29 @@
 
 namespace traversal {
 
+template<typename Node>
+struct FindResult {
+  Node *node = nullptr;
+  Node *parent = nullptr;
+};
+
+template <typename T, typename Node>
+constexpr FindResult<Node>
+find(Node* root, T value, Node *parent) {
+  Node *n = root;
+  for (;;) {
+    if (n->value == value) {
+      return {n, parent};
+    }
+    auto *next = n->should_step_left(value) ? n->left : n->right;
+    if (!next) {
+      return {nullptr, parent};
+    }
+    parent = n;
+    n = next;
+  }
+}
+
 template <typename Node, typename Callback>
 constexpr void in_order (Node *node, Callback &&callback) {
   if (!node) { return; }
@@ -61,23 +84,6 @@ template <typename Node, typename Callback>
 constexpr Node* extreme_right(Node *node, Callback &&callback) {
     return extreme(node, callback, [](auto *n) { return n->right; });
 };
-
-template <typename T, typename Node, typename Callback>
-Node *find(Node* root, T value, Node *parent = nullptr, Callback &&on_found_node = [](auto*&, auto*&) {}) {
-  Node *n = root;
-  for (;;) {
-    if (n->value == value) {
-      on_found_node(n, parent);
-      return n;
-    }
-    auto *next = n->should_step_left(value) ? n->left : n->right;
-    if (!next) {
-      return nullptr;
-    }
-    parent = n;
-    n = next;
-  }
-}
 
 } // namespace traversal
 

@@ -4,13 +4,13 @@
 
 template <typename Tree>
 struct TreeUtils {
-  static void print(Tree& tree) {
+  static void print(const Tree& tree) {
     traversal::in_order(tree.root, [](auto *n) {
       std::cout << n->value << std::endl;
     });
   }
 
-  static bool check_tree_valid(const Tree& tree) /* throws */ {
+  constexpr static bool check_tree_valid(const Tree& tree) /* throws */ {
     if (!tree.root) { return true; }
     auto current = tree.min()->value;
     auto max = tree.max()->value;

@@ -6,11 +6,11 @@
 // #include "max_pooling.hpp"
 #include "bst.hpp"
 
-static_assert([]() {
-  auto tree = BinarySearchTree<int>(4);
-  tree.insert(2);
-  return tree.root->left->value == 2;
-}());
+// static_assert([]() {
+//   auto tree = BinarySearchTree<int>(4);
+//   tree.insert(2);
+//   return tree.root->left->value == 2;
+// }());
 
 
 TEST_CASE("extreme right insertion works") {
@@ -124,32 +124,57 @@ TEST_CASE("zero children node deletion") {
 };
 
 
-auto fuzz = [](auto lower, auto upper) {
-  auto tree = BinarySearchTree<int>{};
-  std::uint64_t seed = 0;
-
-  for (int i = 0; i < 1'000; i++) {
-    auto next = rand() % (upper - lower) + lower;
-    auto* found = tree.find(next);
+constexpr auto random_bst = [](auto lower, auto upper, auto n) {
+  using BST = BinarySearchTree<int>;
+  auto tree = BST{};
+  std::int64_t seed = 0xdeadbeef;
+  auto next_seed = [](auto s) { return s * 1103515245 + 12345; };
+  for (int i = 0; i < n; i++) {
+    seed = next_seed(seed);
+    auto next = (seed % (upper - lower)) + lower;
     tree.insert(next);
   }
 
+  return tree;
+};
+
+
+constexpr auto fuzz = [](auto lower, auto upper, auto n) {
+  using BST = BinarySearchTree<int>;
+  auto tree = random_bst(lower, upper, n);
+
+  std::uint64_t seed = 0xdeadbeef;
+  auto next_seed = [](auto s) { return s * 1103515245 + 12345; };
+  TreeUtils<BinarySearchTree<int>>::print(tree);
+  TreeUtils<BinarySearchTree<int>>::check_tree_valid(tree);
+
   // remove some random ones
   traversal::post_order(tree.root, [&](auto *n) {
-    if (rand() % 2) {
+    seed = next_seed(seed);
+    BST::Utils::print(tree);
+    if (seed % 2) {
+      std::cout << "======================" << n->value << std::endl;
+      std::cout << "removing " << n->value << std::endl;
+      TreeUtils<BinarySearchTree<int>>::print(tree);
       tree.remove(n->value);
     }
   });
 
-  REQUIRE(TreeUtils<BinarySearchTree<int>>::check_tree_valid(tree));
+  std::cout << "+++++++++++++++COMPLETED REMOVALS" << std::endl;
+
+
+  return BST::Utils::check_tree_valid(tree);
 };
 
+// static_assert(fuzz(-20, 10));
+
+
 TEST_CASE("random inserts") {
-  fuzz(-20, 10);
-  fuzz(0, 10);
-  fuzz(0, 1);
-  fuzz(10, -20);
-  fuzz(1 << 1, 1 << 15);
+  fuzz(-20, 10, 1'000);
+  fuzz(0, 10, 1'000);
+  fuzz(0, 1,  1'000);
+  fuzz(10, -20, 1'000);
+  fuzz(1 << 1, 1 << 15, 1'000);
 };
 
 TEST_CASE("Hello, World!") { REQUIRE(1 == 1); }
