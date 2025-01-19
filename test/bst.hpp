@@ -1,5 +1,6 @@
-#include <iostream>
+#include "tree_utils.hpp"
 #include "tree_traversal.hpp"
+
 
 struct NoData {};
 
@@ -9,6 +10,8 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
           delete n;
       });
   }
+
+  typedef TreeUtils<BinarySearchTree<T>> Utils;
 
   struct Node {
     T value{};
@@ -56,7 +59,7 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
       return traversal::find<T, Node>(this, value, nullptr, noop);
     }
 
-    // make this configurable with static lambda ?
+    // make this configurable with static lambda, to evaluate diff types?
     constexpr auto should_step_left(T new_value) noexcept {
       return new_value < value;
     }
@@ -92,7 +95,7 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
   auto remove(T value) {
     if (!root) { return; }
     root->remove(value, root);
-    debug_tree_check();
+    Utils::debug_tree_check(*this);
   }
 
   auto insert(T value) {
@@ -101,38 +104,7 @@ template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
       return;
     }
     root->insert(value);
-    debug_tree_check();
-  }
-
-  void print() {
-    traversal::in_order(root, [](auto *n) {
-      std::cout << n->value << std::endl;
-    });
-  }
-
-  bool check_tree_valid() const /* throws */ {
-    if (!root) { return true; }
-    auto current = min()->value;
-    try {
-      traversal::in_order(root, [&](auto *n) {
-        if (n->value < current) {
-          throw std::runtime_error("tree is not valid");
-        }
-        current = n->value;
-      });
-    } catch (const std::runtime_error &e) {
-      return false;
-    }
-    return true;
-  }
-
-  auto debug_tree_check() {
-#ifndef NDEBUG
-    if (!check_tree_valid()) {
-      std::cerr << "tree is not valid" << std::endl;
-      std::abort();
-    }
-#endif
+    Utils::debug_tree_check(*this);
   }
 };
 

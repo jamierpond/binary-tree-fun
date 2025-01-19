@@ -1,3 +1,4 @@
+#include "tree_utils.hpp"
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
 #include <iostream>
@@ -89,8 +90,6 @@ TEST_CASE("zero children node deletion") {
   REQUIRE(tree.root->right->right->right->value == 4);
   REQUIRE(tree.root->right->right->right != nullptr);
 
-  tree.print();
-
   tree.remove(4);
 
   REQUIRE(tree.root->right->right->right == nullptr);
@@ -112,15 +111,16 @@ TEST_CASE("zero children node deletion") {
   // test min and max
   REQUIRE(tree.min()->value == -3);
   REQUIRE(tree.max()->value == 4);
-  REQUIRE(tree.check_tree_valid());
+  REQUIRE(TreeUtils<BinarySearchTree<int>>::check_tree_valid(tree));
 
   std::cout << "+++++ smallest to biggest +++++" << std::endl;
-  tree.print();
 };
 
 
 auto fuzz = [](auto lower, auto upper) {
   auto tree = BinarySearchTree<int>{};
+  std::uint64_t seed = 0;
+
   for (int i = 0; i < 1'000; i++) {
     auto next = rand() % (upper - lower) + lower;
     auto* found = tree.find(next);
@@ -134,7 +134,7 @@ auto fuzz = [](auto lower, auto upper) {
     }
   });
 
-  REQUIRE(tree.check_tree_valid());
+  REQUIRE(TreeUtils<BinarySearchTree<int>>::check_tree_valid(tree));
 };
 
 TEST_CASE("random inserts") {
