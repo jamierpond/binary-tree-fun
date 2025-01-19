@@ -13,6 +13,7 @@ struct TreeUtils {
   static bool check_tree_valid(Tree& tree) /* throws */ {
     if (!tree.root) { return true; }
     auto current = tree.min()->value;
+    auto max = tree.max()->value;
     try {
       traversal::in_order(tree.root, [&](auto *n) {
         if (n->value < current) {
@@ -21,6 +22,9 @@ struct TreeUtils {
         current = n->value;
       });
     } catch (const std::runtime_error &e) {
+      return false;
+    }
+    if (current != max) {
       return false;
     }
     return true;

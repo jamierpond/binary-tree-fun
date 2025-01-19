@@ -1,7 +1,6 @@
 #include "tree_utils.hpp"
 #include "tree_traversal.hpp"
 
-
 struct NoData {};
 
 template <typename T, typename DataStruct = NoData> struct BinarySearchTree {
