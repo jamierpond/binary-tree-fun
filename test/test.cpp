@@ -79,6 +79,50 @@ push_front()
 
 */
 
+using namespace pond;
+static_assert(deque<int, 10>{}.empty());
+static_assert(deque<int, 10>{}.size() == 0);
+static_assert([] {
+  // looks like it works...
+  auto dq = deque<int, 10>{};
+  dq.push_back(1);
+  dq.push_back(2);
+  dq.push_back(3);
+  dq.push_back(4);
+  if (dq.back() != 4) { return false; }
+  if (dq.size() != 4) { return false; }
+  dq.pop_back();
+  if (dq.size() != 3) { return false; }
+  if (dq.back() != 3) { return false; }
+  dq.pop_front();
+  if (dq.size() != 2) { return false; }
+  if (dq.front() != 2) { return false; }
+  dq.pop_front();
+  if (dq.size() != 1) { return false; }
+  if (dq.front() != 3) { return false; }
+  return true;
+}());
+
+
+// harder tests...
+static_assert([] {
+  auto dq = deque<int, 10, BoundsChecking::SilentReturn>{};
+  dq.push_back(1);
+  dq.push_back(2);
+  dq.push_back(3);
+  dq.push_back(4);
+  dq.push_back(5);
+  dq.push_back(6);
+  dq.push_back(7);
+  dq.push_back(8);
+  dq.push_back(9);
+  dq.push_back(10);
+  // silent return for bounds checking
+  if (dq.back() != 9) { return false; }
+  return true;
+}());
+
+
 
 TEST_CASE("max pooling algo works") {
   auto arr = std::array<int, 8>{8, 3, -1, -3, 5, 3, 6, 7};
