@@ -18,25 +18,20 @@ struct deque {
   constexpr auto pop_front() { front_ptr = increment(front_ptr); }
   constexpr auto push_front(T val) { emplace<decrement>(front_ptr, val); }
   constexpr auto push_back(T val) { emplace<increment>(back_ptr, val); }
-
   constexpr auto size() const { return modulo(back_ptr - front_ptr); }
   constexpr auto operator[](size_t i) const { return arr[(front_ptr + i) % MaxSize]; }
   constexpr auto empty() const { return front_ptr == back_ptr; }
   constexpr auto nearly_full() const { return increment(back_ptr) == front_ptr; }
-
   constexpr auto front() const { return arr[front_ptr]; }
   constexpr auto back() const {
     if (size() <= 1) { return arr[front_ptr]; }
     return arr[decrement(back_ptr)];
   }
-
 private:
-  std::array<T, MaxSize> arr{};
-  size_t front_ptr = 0;
-  size_t back_ptr = 0;
   template <auto PointerFn>
   constexpr auto emplace(size_t& ptr, T val) {
-    if constexpr (BoundsCheckOption == BoundsChecking::SilentReturn) {
+    constexpr auto sr = BoundsCheckOption == BoundsChecking::SilentReturn;
+    if constexpr (sr) {
       if (nearly_full()) { return; }
     }
     arr[ptr] = val;
@@ -45,6 +40,9 @@ private:
   constexpr static auto modulo(size_t val) { return (val + MaxSize) % MaxSize; }
   constexpr static auto increment(size_t ptr) { return modulo(ptr + 1); }
   constexpr static auto decrement(size_t ptr) { return modulo(ptr - 1); }
+  std::array<T, MaxSize> arr{};
+  size_t front_ptr = 0;
+  size_t back_ptr = 0;
 };
 
 static_assert(deque<int, 10>{}.empty());
@@ -91,13 +89,16 @@ static_assert([] {
 
 } // namespace pond
 
-constexpr auto get_max_pool_out_size = [](auto N, auto K, auto Stride) {
-  return (N / Stride) - K + 1;
+constexpr auto get_max_pool_out_size = [](auto N, auto K) {
+  return N - K + 1;
 };
 
 template <typename T, size_t K>
 constexpr auto max_pool_1d(const T* arr, size_t N)  {
-  auto sz = get_max_pool_out_size(N, K, 1);
+  auto sz = get_max_pool_out_size(N, K);
+  // todo, make std::array and/or do in place
+  // is more annoying to compare static std::array than std::vector
+  // the operator== defined for std::array is not constexpr :(
   auto result = std::vector<T>(sz);
 
   auto dq = pond::deque<size_t, K + 1>{};
@@ -119,6 +120,7 @@ constexpr auto max_pool_1d(const T* arr, size_t N)  {
       result[i - K + 1] = arr[dq.front()];
     }
   }
+
   return result;
 }
 
@@ -128,4 +130,6 @@ constexpr auto max_pool_1d(const std::array<T, N>& arr) {
 }
 
 static_assert(max_pool_1d<int, 8, 3>({8, 3, -1, -3, 5, 3, 6, 7}) == std::vector<int>{8, 3, 5, 5, 6, 7});
+static_assert(max_pool_1d<int, 8, 2>({8, 3, -1, -3, 5, 3, 6, 7}) == std::vector<int>{8, 3, -1, 5, 5, 6, 7});
+static_assert(max_pool_1d<int, 8, 5>({8, 3, -1, -3, 5, 3, 6, 7}) == std::vector<int>{8, 5, 6, 7});
 

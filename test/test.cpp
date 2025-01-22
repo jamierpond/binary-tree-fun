@@ -82,9 +82,9 @@ push_front()
 
 TEST_CASE("max pooling algo works") {
   auto arr = std::array<int, 8>{8, 3, -1, -3, 5, 3, 6, 7};
-  auto expected = std::array<int, 6>{8, 3, 5, 5, 6, 7};
+  auto expected = std::vector<int>{8, 3, 5, 5, 6, 7};
   auto out = max_pool_1d<int, 8, 3>(arr);
-  REQUIRE(array_equal(out, expected));
+  REQUIRE(out == expected);
 };
 
 TEST_CASE("extreme right insertion works") {
