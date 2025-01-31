@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <iostream>
 #include "max_pooling.hpp"
+#include "./foo.hpp"
 
 TEST_CASE("deque works") {
   auto dq = pond::deque<int, 10>{};
